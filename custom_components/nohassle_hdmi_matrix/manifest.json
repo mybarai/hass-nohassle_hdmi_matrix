@@ -1,11 +1,12 @@
 {
-  "domain": "nohassle_hdmi_matrix",
+  "domain": "nohassle_hdmi_matrix_v2",
   "name": "No Hassle AV HDMI Matrix",
-  "documentation": "https://github.com/IDmedia/hass-nohassle_hdmi_matrix",
+  "documentation": "https://github.com/mybarai/hass-nohassle_hdmi_matrix/",
   "requirements": [],
   "dependencies": [],
   "version": "1.0.0",
   "codeowners": [
-    "@IDmedia"
+    "@mybarai"
   ]
 }
+
