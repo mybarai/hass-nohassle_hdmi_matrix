@@ -2,8 +2,12 @@
 import json
 import logging
 import datetime
-import urllib.request
+import uuid
 import voluptuous as vol
+import homeassistant.helpers.config_validation as cv
+import requests
+
+
 
 from homeassistant.components.media_player import (
     MediaPlayerEntity, 
@@ -23,7 +27,6 @@ from homeassistant.const import (
     STATE_OFF,
     STATE_ON
 )
-import homeassistant.helpers.config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,7 +86,7 @@ def setup_platform(hass, config, add_entities, discovery_debug=None):
     devices = []
     for zone_id, extra in config[CONF_ZONES].items():
         _LOGGER.debug('Adding zone %d - %s', zone_id, extra[CONF_NAME])
-        unique_id = f'{connection}-{zone_id}'
+        unique_id = uuid.uuid4()
         device = HDMIMatrixZone(connection, sources, zone_id, extra[CONF_NAME])
         hass.data[DATA_HDMIMATRIX][unique_id] = device
         devices.append(device)
@@ -97,6 +100,7 @@ def setup_platform(hass, config, add_entities, discovery_debug=None):
         source = service.data.get(ATTR_SOURCE)
         if entity_ids:
             _LOGGER.debug('Got to entity ids')
+            _LOGGER.debug(entity_ids)
             devices = [device for device in hass.data[DATA_HDMIMATRIX].values()
                         if device.entity_id in entity_ids]
         
@@ -116,6 +120,7 @@ class HDMIMatrixZone(MediaPlayerEntity):
     """Representation of a HDMI matrix zone."""
     def __init__(self, hdmi_host, sources, zone_id, zone_name):
         """Initialize new zone."""
+        _LOGGER.debug('Initializing New Zone')
         self._hdmi_host = hdmi_host
         # dict source_id -> source name
         self._source_id_name = sources
@@ -126,37 +131,38 @@ class HDMIMatrixZone(MediaPlayerEntity):
                                     key=lambda v: self._source_name_id[v])
         self._zone_id = zone_id
         self._name = zone_name
-        self._state = None
+        self._state = 'on'
         self._source = None
         
     def update(self):
         """Retrieve latest state."""
         try:
-            with urllib.request.urlopen(f'http://{self._hdmi_host}/AutoGetAllData', timeout=5) as response:
-                response = response.read().decode('utf-8')
-                inputs = response.split('&')
+            _LOGGER.debug('Updating...')
+            updateURL = f'http://{self._hdmi_host}/AutoGetAllData'
+            with requests.get(updateURL, headers={'Host': 'www.example.com'}) as response:
+                _LOGGER.debug(response.content)            
+                inputs = response.content
+                inputs = inputs.decode().split('&')
+                _LOGGER.debug(inputs)
                 inputs = inputs[-11:-3]
+                _LOGGER.debug(inputs)
                 states = [(int(i) + 1) for i in inputs]
                 state = states[self._zone_id - 1]
 
-                idx = state
-                self._state = STATE_ON
-                if idx in self._source_id_name:
-                    self._source = self._source_id_name[idx]
-                else:
-                    self._source = None
-
-                _LOGGER.debug('State: %s', state)
         except:
             self._state = STATE_OFF
             state = None
-            _LOGGER.debug('ERR: State set to NONE')
-            _LOGGER.debug('Inputs: %s', inputs)
-            _LOGGER.debug('States: %s', states)
-                
+        
         if not state:
-            _LOGGER.debug('ERR: No state from input')
             return
+
+        idx = state
+        self._state = STATE_ON
+        if idx in self._source_id_name:
+            self._source = self._source_id_name[idx]
+        else:
+            self._source = None
+
 
 
     @property
@@ -199,6 +205,8 @@ class HDMIMatrixZone(MediaPlayerEntity):
         _LOGGER.debug('Setting zone %d source to %s', self._zone_id, idx)
 
         try:
-            urllib.request.urlopen(f'http://{self._hdmi_host}/@PORT{self._zone_id}={idx}.0', timeout=5)
+            setURL = f'http://{self._hdmi_host}/@PORT{self._zone_id}={idx}.0'
+            #urllib.request.urlopen(f'http://{self._hdmi_host}/@PORT{self._zone_id}={idx}.0', timeout=5)
+            requests.post(setURL, headers={'Host': 'www.example.com'})
         except:
             pass
